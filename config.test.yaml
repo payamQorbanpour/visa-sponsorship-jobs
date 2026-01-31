@@ -1,0 +1,39 @@
+# Quick Test Configuration
+# Use this for testing with minimal searches
+
+job_roles:
+  - DevOps Engineer
+
+countries:
+  - germany
+
+job_sites:
+  priority:
+    - indeed
+  secondary: []
+  disabled:
+    - glassdoor
+    - linkedin
+    - google
+    - zip_recruiter
+
+visa_keywords:
+  - visa sponsorship
+  - visa
+  - relocation
+
+search_params:
+  results_per_site: 100  # Small number for testing
+  job_type: fulltime
+  is_remote: false
+  hours_old: 168  # 7 days
+  distance: 50
+
+output:
+  format: csv
+  directory: results
+  filename_pattern: test_jobs_{timestamp}.csv
+
+filters:
+  visa_sponsorship_filter: true
+  case_sensitive: false

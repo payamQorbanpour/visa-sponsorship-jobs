@@ -1,0 +1,86 @@
+# Job Scraper Configuration
+
+# Job roles to search for
+job_roles:
+  - DevOps Engineer
+  - Site Reliability Engineer
+  - Platform Engineer
+  - Infrastructure Engineer
+
+# Countries to search (entire country)
+countries:
+  - germany
+  - netherlands
+  - sweden
+  - spain
+  - belgium
+  - austria
+
+# Job sites configuration
+job_sites:
+  # Priority sites (searched first, more reliable for EU)
+  priority:
+    - indeed
+    - glassdoor
+  
+  # Secondary sites
+  secondary:
+    - linkedin
+    - google
+    - zip_recruiter
+  
+  # Disabled sites (add sites here to exclude them)
+  disabled: []
+    # - linkedin  # Uncomment to disable
+    # - google
+
+# Visa sponsorship keywords (case-insensitive by default)
+visa_keywords:
+  - visa sponsorship
+  - visa
+  - visa support
+  - relocation package
+  - relocation assistance
+  - work permit
+  - sponsorship available
+  - relocation
+  - work visa
+  - immigration support
+  - EU work permit
+  - blue card
+
+# Search parameters
+search_params:
+  results_per_site: 50          # Number of results per site
+  job_type: fulltime            # fulltime, parttime, contract, internship
+  is_remote: false              # true for remote, false for on-site
+  hours_old: 168                # Max age in hours (168 = 7 days)
+  distance: 50                  # Search radius in miles
+
+# Output configuration
+output:
+  format: csv                   # csv, json, or excel
+  directory: results            # Output directory
+  filename_pattern: jobs_{timestamp}.csv  # Filename pattern
+
+# Filters
+filters:
+  visa_sponsorship_filter: true  # Enable/disable visa keyword filtering
+  case_sensitive: false          # Case-sensitive keyword matching
+  exclusion_filter: true         # Enable/disable exclusion filtering
+
+# Exclusion keywords - jobs containing these phrases will be filtered out
+exclusion_keywords:
+  - national of an EU member state
+  - EU member state national
+  - EU citizen
+  - European Union citizen
+  - EU citizenship required
+  - must be an EU national
+  - EU passport required
+  - citizenship of an EU country
+  - only EU nationals
+  - restricted to EU citizens
+  - EU/EEA nationals only
+  - EEA nationals only
+  - Swiss nationals only
