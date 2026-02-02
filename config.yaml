@@ -3,31 +3,29 @@
 # Job roles to search for
 job_roles:
   - DevOps Engineer
-  - Site Reliability Engineer
-  - Platform Engineer
-  - Infrastructure Engineer
+  # - Site Reliability Engi
 
 # Countries to search (entire country)
 countries:
   - germany
-  - netherlands
-  - sweden
-  - spain
-  - belgium
-  - austria
+  # - netherlands
+  # - sweden
+  # - spain
+  # - belgium
+  # - austria
 
 # Job sites configuration
 job_sites:
   # Priority sites (searched first, more reliable for EU)
   priority:
-    - indeed
+    # - indeed
     - glassdoor
   
   # Secondary sites
   secondary:
     - linkedin
-    - google
-    - zip_recruiter
+    # - google
+    # - zip_recruiter
   
   # Disabled sites (add sites here to exclude them)
   disabled: []
@@ -84,3 +82,11 @@ exclusion_keywords:
   - EU/EEA nationals only
   - EEA nationals only
   - Swiss nationals only
+
+captcha:
+  enabled: true                  # Enable CAPTCHA handling
+  method: manual                 # Manual solving
+  browser: undetected-chrome     # Better Cloudflare bypass
+  headless: false                # Must be false for manual
+  wait_timeout: 300              # 5 minutes to solve
+  glassdoor_only: true           # Only for Glassdoor

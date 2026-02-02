@@ -10,6 +10,7 @@ import json
 import os
 import re
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional, Set
@@ -17,6 +18,23 @@ from typing import List, Dict, Optional, Set
 import pandas as pd
 import yaml
 from jobspy import scrape_jobs
+
+# Browser automation for CAPTCHA handling (optional)
+try:
+    from selenium import webdriver
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    from selenium.common.exceptions import TimeoutException, NoSuchElementException
+    SELENIUM_AVAILABLE = True
+except ImportError:
+    SELENIUM_AVAILABLE = False
+
+try:
+    import undetected_chromedriver as uc
+    UNDETECTED_CHROME_AVAILABLE = True
+except ImportError:
+    UNDETECTED_CHROME_AVAILABLE = False
 
 
 class JobScraper:
@@ -71,6 +89,14 @@ class JobScraper:
             'visa_sponsorship_filter': True,
             'exclusion_filter': True,
             'case_sensitive': False
+        },
+        'captcha': {
+            'enabled': False,  # Enable browser automation for manual CAPTCHA solving
+            'method': 'manual',  # 'manual' or 'auto' (auto requires service integration)
+            'browser': 'chrome',  # 'chrome' or 'undetected-chrome'
+            'headless': False,  # Must be False for manual solving
+            'wait_timeout': 300,  # Max seconds to wait for manual CAPTCHA solving
+            'glassdoor_only': True  # Only use browser automation for Glassdoor
         }
     }
     
@@ -88,6 +114,7 @@ class JobScraper:
             'by_site': {},
             'by_country': {}
         }
+        self.driver = None  # Browser driver for CAPTCHA handling
     
     def load_config(self, config_path: str):
         """Load configuration from YAML file"""
@@ -109,6 +136,131 @@ class JobScraper:
                 self._deep_update(base_dict[key], value)
             else:
                 base_dict[key] = value
+    
+    def init_browser(self):
+        """Initialize browser for CAPTCHA handling"""
+        if not self.config['captcha']['enabled']:
+            return None
+        
+        if not SELENIUM_AVAILABLE:
+            print("⚠️  Warning: Selenium not installed. Install with: pip install selenium")
+            print("   CAPTCHA handling disabled.")
+            return None
+        
+        browser_type = self.config['captcha']['browser']
+        headless = self.config['captcha']['headless']
+        
+        if headless and self.config['captcha']['method'] == 'manual':
+            print("⚠️  Warning: Headless mode disabled for manual CAPTCHA solving")
+            headless = False
+        
+        try:
+            print("\n🌐 Initializing browser for CAPTCHA handling...")
+            
+            if browser_type == 'undetected-chrome' and UNDETECTED_CHROME_AVAILABLE:
+                options = uc.ChromeOptions()
+                if headless:
+                    options.add_argument('--headless')
+                options.add_argument('--no-sandbox')
+                options.add_argument('--disable-dev-shm-usage')
+                self.driver = uc.Chrome(options=options)
+                print("   ✓ Using undetected-chromedriver (better for Cloudflare)")
+            else:
+                if browser_type == 'undetected-chrome' and not UNDETECTED_CHROME_AVAILABLE:
+                    print("   ⚠️  undetected-chromedriver not installed, using standard Chrome")
+                    print("      Install with: pip install undetected-chromedriver")
+                
+                options = webdriver.ChromeOptions()
+                if headless:
+                    options.add_argument('--headless')
+                options.add_argument('--no-sandbox')
+                options.add_argument('--disable-dev-shm-usage')
+                options.add_argument('--disable-blink-features=AutomationControlled')
+                options.add_experimental_option('excludeSwitches', ['enable-automation'])
+                options.add_experimental_option('useAutomationExtension', False)
+                
+                self.driver = webdriver.Chrome(options=options)
+                print("   ✓ Using standard Chrome WebDriver")
+            
+            return self.driver
+        
+        except Exception as e:
+            print(f"❌ Error initializing browser: {e}")
+            print("   Make sure ChromeDriver is installed and in PATH")
+            print("   Install with: brew install chromedriver (macOS)")
+            return None
+    
+    def close_browser(self):
+        """Close browser if open"""
+        if self.driver:
+            try:
+                self.driver.quit()
+                print("\n🌐 Browser closed")
+            except Exception as e:
+                print(f"⚠️  Error closing browser: {e}")
+            self.driver = None
+    
+    def handle_captcha_manual(self, url: str) -> bool:
+        """Handle CAPTCHA manually by opening browser and waiting for user"""
+        if not self.driver:
+            self.driver = self.init_browser()
+            if not self.driver:
+                return False
+        
+        try:
+            print(f"\n🔓 Opening browser for CAPTCHA handling...")
+            print(f"   URL: {url}")
+            
+            self.driver.get(url)
+            
+            # Check if CAPTCHA/Cloudflare challenge is present
+            time.sleep(3)  # Wait for page to load
+            
+            page_title = self.driver.title.lower()
+            if 'cloudflare' in page_title or 'just a moment' in page_title:
+                print("\n⚠️  Cloudflare challenge detected!")
+                print("   📋 Please solve the CAPTCHA in the browser window")
+                print(f"   ⏰ Waiting up to {self.config['captcha']['wait_timeout']} seconds...")
+                print("   💡 The script will continue automatically once solved")
+                
+                # Wait for Cloudflare to be solved
+                timeout = self.config['captcha']['wait_timeout']
+                start_time = time.time()
+                
+                while time.time() - start_time < timeout:
+                    time.sleep(2)
+                    current_title = self.driver.title.lower()
+                    
+                    # Check if we've passed the challenge
+                    if 'cloudflare' not in current_title and 'just a moment' not in current_title:
+                        print("\n   ✅ CAPTCHA solved! Continuing...")
+                        time.sleep(2)  # Give page time to fully load
+                        return True
+                    
+                    # Show progress
+                    elapsed = int(time.time() - start_time)
+                    if elapsed % 10 == 0 and elapsed > 0:
+                        print(f"   ⏳ Still waiting... ({elapsed}s elapsed)")
+                
+                print("\n   ⏰ Timeout waiting for CAPTCHA solution")
+                return False
+            else:
+                print("   ✓ No CAPTCHA detected")
+                return True
+        
+        except Exception as e:
+            print(f"\n❌ Error handling CAPTCHA: {e}")
+            return False
+    
+    def should_use_browser_for_site(self, site: str) -> bool:
+        """Determine if browser automation should be used for this site"""
+        if not self.config['captcha']['enabled']:
+            return False
+        
+        if self.config['captcha']['glassdoor_only']:
+            return site.lower() == 'glassdoor'
+        
+        return True
     
     def get_enabled_sites(self) -> List[str]:
         """Get list of enabled job sites"""
@@ -230,6 +382,19 @@ class JobScraper:
         print(f"💼 Role: {role}")
         print(f"🔗 Sites: {', '.join(enabled_sites)}")
         print(f"{'='*60}")
+        
+        # Check if we need to pre-handle CAPTCHA for any sites
+        if self.config['captcha']['enabled']:
+            for site in enabled_sites:
+                if self.should_use_browser_for_site(site):
+                    print(f"\n🔓 Pre-checking {site} for CAPTCHA...")
+                    # Pre-open Glassdoor to handle CAPTCHA
+                    if site.lower() == 'glassdoor':
+                        test_url = f"https://www.glassdoor.com/Job/germany-jobs-SRCH_IL.0,7_IN96.htm"
+                        if not self.handle_captcha_manual(test_url):
+                            print(f"   ⚠️  Could not pass CAPTCHA for {site}, results may be limited")
+                        else:
+                            print(f"   ✓ {site} CAPTCHA cleared")
         
         try:
             jobs_df = scrape_jobs(
@@ -401,41 +566,46 @@ class JobScraper:
         print("🔍 JOB SCRAPER FOR VISA SPONSORSHIP POSITIONS")
         print("="*60)
         
-        # Scrape jobs
-        jobs_df = self.scrape_all()
-        
-        if jobs_df.empty:
-            return
-        
-        # Filter by visa sponsorship
-        filtered_df = self.filter_by_visa_sponsorship(jobs_df)
-        
-        # Apply exclusion filter (remove jobs requiring EU citizenship)
-        filtered_df = self.filter_by_exclusion(filtered_df)
-        
-        self.stats['after_filter'] = len(filtered_df)
-        
-        # Save results
-        if filtered_df.empty and not jobs_df.empty:
-            # No results after filtering, but we have unfiltered results
-            print("\n⚠️  No jobs found with visa sponsorship keywords")
-            print("💾 Saving unfiltered results for manual review...")
+        try:
+            # Scrape jobs
+            jobs_df = self.scrape_all()
             
-            # Add a note column
-            jobs_df['note'] = 'No visa keywords found - manual review needed'
-            self.save_results(jobs_df, output_path, suffix='_unfiltered')
-        elif not filtered_df.empty:
-            # Save filtered results
-            self.save_results(filtered_df, output_path)
+            if jobs_df.empty:
+                return
             
-            # Also save unfiltered if different
-            if len(filtered_df) < len(jobs_df):
-                print(f"\n💾 Also saving unfiltered results ({len(jobs_df)} total jobs)...")
-                jobs_df['note'] = 'Unfiltered - may not have visa keywords'
-                self.save_results(jobs_df, output_path, suffix='_all_jobs')
+            # Filter by visa sponsorship
+            filtered_df = self.filter_by_visa_sponsorship(jobs_df)
+            
+            # Apply exclusion filter (remove jobs requiring EU citizenship)
+            filtered_df = self.filter_by_exclusion(filtered_df)
+            
+            self.stats['after_filter'] = len(filtered_df)
+            
+            # Save results
+            if filtered_df.empty and not jobs_df.empty:
+                # No results after filtering, but we have unfiltered results
+                print("\n⚠️  No jobs found with visa sponsorship keywords")
+                print("💾 Saving unfiltered results for manual review...")
+                
+                # Add a note column
+                jobs_df['note'] = 'No visa keywords found - manual review needed'
+                self.save_results(jobs_df, output_path, suffix='_unfiltered')
+            elif not filtered_df.empty:
+                # Save filtered results
+                self.save_results(filtered_df, output_path)
+                
+                # Also save unfiltered if different
+                if len(filtered_df) < len(jobs_df):
+                    print(f"\n💾 Also saving unfiltered results ({len(jobs_df)} total jobs)...")
+                    jobs_df['note'] = 'Unfiltered - may not have visa keywords'
+                    self.save_results(jobs_df, output_path, suffix='_all_jobs')
+            
+            # Print stats
+            self.print_statistics()
         
-        # Print stats
-        self.print_statistics()
+        finally:
+            # Always close browser if open
+            self.close_browser()
 
 
 def interactive_mode():
