@@ -2,30 +2,34 @@
 
 # Job roles to search for
 job_roles:
-  - DevOps Engineer
+  - Software Engineer
+  - Golang
+  - Golang Developer
+  - Backend
+  - Backend Developer
   # - Site Reliability Engi
 
 # Countries to search (entire country)
 countries:
-  - germany
+  # - germany
   # - netherlands
   # - sweden
   # - spain
   # - belgium
-  # - austria
+  - austria
 
 # Job sites configuration
 job_sites:
   # Priority sites (searched first, more reliable for EU)
   priority:
-    # - indeed
+    - indeed
     - glassdoor
   
   # Secondary sites
   secondary:
     - linkedin
-    # - google
-    # - zip_recruiter
+    - google
+    - zip_recruiter
   
   # Disabled sites (add sites here to exclude them)
   disabled: []

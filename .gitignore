@@ -39,6 +39,7 @@ results/
 # Environment
 .env
 .env.local
+config.yaml
 
 # OS
 .DS_Store
